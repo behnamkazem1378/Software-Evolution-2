@@ -1,2 +1,201 @@
 \section{استفاده از دستورات و ساختارهای غیرمعمول}
+\label{section:unusual-instructions}
+	
+	دستورات و ساختارهای غیرمعمول یکی از تکنیک‌های مؤثر در \lr{Anti-Disassembly} هستند که با بهره‌گیری از ویژگی‌های خاص معماری پردازنده، تحلیل استاتیک کد را برای دیس‌اسمبلرها با چالش مواجه می‌کنند.
+	
+	\subsection{معرفی دستورات و روش های غیرمعمول}
+	\label{subsec:unusual-methods}
+	
+	دستورات غیرمعمول به دستوراتی اطلاق می‌شود که یا به ندرت در کدهای عادی استفاده می‌شوند یا رفتار پیچیده‌ای دارند که پردازش آن‌ها برای دیس‌اسمبلرها دشوار است.
+	
+	\subsubsection{دستورات شرطی با شرایط پیچیده}
+	\label{subsubsec:complex-conditions}
+	
+	\paragraph{مکانیزم عملکرد:}
+	\leavevmode
+	در این تکنیک، از ترکیب دستورات شرطی و محاسبات پیچیده برای ایجاد مسیرهای اجرایی مبهم استفاده می‌شود. دیس‌اسمبلرها که معمولاً بر پایه تحلیل خطی کد کار می‌کنند، در تشخیص مسیر صحیح اجرا دچار اشتباه می‌شوند. برای مثال:
+	
+	\begin{latin}
+		\begin{verbatim}
+			; Example of complex conditional jump
+			cmp eax, ebx
+			jz normal_path
+			jmp unusual_path
+			
+			unusual_path:
+			; Unusual instructions sequence
+			pushf
+			pop ax
+			and ax, 0x0FFF
+			jmp complex_calc
+			
+			complex_calc:
+			; Complex calculation that confuses disassemblers
+			mov ecx, eax
+			ror ecx, 3
+			xor ecx, 0xDEADBEEF
+		\end{verbatim}
+	\end{latin}
+	\paragraph{شرح کد:}
+در این کد، دیس‌اسمبلر در تشخیص مسیر اجرای واقعی دچار سردرگمی می‌شود. بخش ابتدایی با مقایسه رجیسترها و پرش شرطی یک تصمیم‌گیری ساده نشان می‌دهد، اما مسیر \lr{unusual-path} با خواندن فلگ‌های پردازنده (\lr{pushf/pop}) و ایجاد محاسبات پیچیده (\lr{ror/xor})، شرایط اجرایی مبهمی ایجاد می‌کند که وابسته به داده‌های پویای زمان اجراست. این پیچیدگی باعث می‌شود دیس‌اسمبلر نتواند مسیرهای اجرایی را به درستی شناسایی کند.
+
+	
+	\subsubsection{دستورات \lr{FPU} غیرمعمول}
+	\label{subsubsec:fpu-unusual}
+	
+	دستورات واحد محاسبات ممیز شناور \lr{(FPU)} به دلیل پیچیدگی ذاتی، گزینه مناسبی برای ایجاد سد در برابر دیس‌اسمبلرها هستند:
+	
+	\begin{latin}
+		\begin{verbatim}
+			; Unusual FPU instructions
+			fldz                    ; Load +0.0
+			fchs                    ; Change sign
+			fstp st(1)              ; Unusual stack operation
+			fcomip st(0), st(1)     ; Compare and pop
+		\end{verbatim}
+	\end{latin}
+	\paragraph{شرح کد:}
+	این دنباله دستورات واحد ممیز شناور \lr{(FPU)} با ایجاد عملیات غیرمعمول روی پشته \lr{FPU}، دیس‌اسمبلرها را گمراه می‌کند. مکانیزم کار به این صورت است که ابتدا مقدار صفر به پشته بارگذاری شده، سپس علامت آن تغییر می‌کند که یک عمل غیرمعمول محسوب می‌شود. در ادامه با ذخیره و خارج کردن غیراستاندارد از پشته و مقایسه همراه با حذف عناصر، یک الگوی استفاده پیچیده از پشته \lr{FPU} ایجاد می‌شود که بسیاری از دیس‌اسمبلرها در تحلیل صحیح آن دچار مشکل می‌شوند.
+	
+	
+	\subsubsection{استفاده از دستورات خود-تغییر‌دهنده کد}
+	\label{subsec:self-modifying-code}
+	
+	یکی از پیچیده‌ترین تکنیک‌های ضد دیس‌اسمبل، استفاده از کد خود-تغییر‌دهنده است که در آن برنامه در حین اجرا، بخشی از کد خود را تغییر می‌دهد. در این تکنیک، برنامه در زمان اجرا دستورات خود را اصلاح می‌کند که این کار تحلیل استاتیک را غیرممکن می‌سازد. دیس‌اسمبلرها که معمولاً کد را به صورت استاتیک تحلیل می‌کنند، قادر به پیش‌بینی تغییرات پویای کد نیستند.
+	
+	\begin{latin}
+		\begin{verbatim}
+			; Self-modifying code example
+			section .data
+			code_buffer db 0x90, 0x90, 0x90  ; NOP instructions
+			
+			section .text
+			mov esi, code_buffer
+			mov byte [esi], 0xB8    ; MOV EAX, immediate
+			mov dword [esi+1], 0x12345678  ; Immediate value
+			mov byte [esi+5], 0xC3  ; RET instruction
+			jmp code_buffer          ; Execute modified code
+		\end{verbatim}
+	\end{latin}
+	\paragraph{شرح کد:}
+این کد با تغییر پویای دستورات در حافظه، دیس‌اسمبلرها را به طور کامل گمراه می‌کند. در ابتدا بافر کد حاوی دستورات بی‌اثر \lr{NOP} است، اما در حین اجرا به دنباله‌ای از دستورات \lr{MOV EAX} و \lr{RET} تبدیل می‌شود. دیس‌اسمبلر که تنها محتوای اولیهٔ بافر را می‌بیند، قادر به تشخیص کد نهاییِ اجراشده نخواهد بود.
+
+	\subsection{انواع دستورات غیرمعمول}
+	\label{subsec:unusual-types}
+	
+	\subsubsection{دستورات با رفتار وابسته به حالت}
+	\label{subsubsec:state-dependent}
+	
+	این دستورات رفتار متفاوتی بر اساس حالت فعلی پردازنده دارند:
+	
+	\begin{itemize}
+		\item \lr{\textbf{ENTER}} و \lr{\textbf{LEAVE}} با پارامترهای غیرمعمول
+		\item دستورات \lr{\textbf{BOUND}} برای بررسی محدوده آرایه
+		\item دستورات \lr{\textbf{SALC}} \lr{(Set AL on Carry)}
+	\end{itemize}
+	
+	\subsubsection{دستورات مدیریت رشته‌ها}
+	\label{subsubsec:string-instructions}
+	
+	دستورات رشته‌ای به دلیل وابستگی به رجیسترها می‌توانند پیچیدگی ایجاد کنند:
+	
+	\begin{itemize}
+		\item \lr{\textbf{REP MOVSB}} با تنظیمات غیرمعمول رجیسترها
+		\item \lr{\textbf{SCASB}} با مقادیر جستجوی پیچیده
+		\item \lr{\textbf{CMPSW}} با اندازه‌های غیراستاندارد
+	\end{itemize}
+	
+	\subsubsection{دستورات سیستم و ممیزی}
+	\label{subsubsec:system-instructions}
+	
+	استفاده از دستورات سطح سیستم می‌تواند دیس‌اسمبلرها را دچار خطا کند:
+	
+	\begin{itemize}
+		\item \lr{\textbf{IN}} و \lr{\textbf{OUT}} برای دسترسی به پورت‌ها
+		\item دستورات \lr{\textbf{SGDT}}، \lr{\textbf{SIDT}}، \lr{\textbf{SLDT}}
+		\item دستورات \lr{\textbf{VERR}}، \lr{\textbf{VERW}}
+	\end{itemize}
+	
+	\subsection{مکانیزم عملکرد ضد دیس‌اسمبل}
+	\label{subsec:anti-disassembly-mechanism}
+	
+	دستورات غیرمعمول از چند طریق بر دیس‌اسمبلرها تأثیر می‌گذارند:
+	
+	\subsubsection{ایجاد خطا در تحلیل جریان کنترل}
+	\label{subsubsec:control-flow}
+	
+	\begin{itemize}
+		\item \textbf{شکستن تحلیل جریان خطی}: با ایجاد پرش‌های غیرقابل پیش‌بینی
+		\item \textbf{ایجاد بلوک‌های کد مبهم}: با ساختارهای شرطی پیچیده
+		\item \textbf{مختل کردن تحلیل داده}: با دستوراتی که وابستگی داده‌ای پیچیده ایجاد می‌کنند
+	\end{itemize}
+	
+	\subsubsection{سوءاستفاده از محدودیت‌های دیس‌اسمبلر}
+	\label{subsubsec:disassembler-limitations}
+	
+	\begin{itemize}
+		\item \textbf{عدم پشتیبانی از دستورات نادر}: برخی دیس‌اسمبلرها دستورات کم‌کاربرد را نمی‌شناسند
+		\item \textbf{خطا در تحلیل حالت پردازنده}: دستورات وابسته به حالت را به درستی پردازش نمی‌کنند
+		\item \textbf{مشکل در تحلیل دستورات \lr{FPU}}: پیچیدگی محاسبات ممیز شناور باعث خطا می‌شود
+	\end{itemize}
+	
+	\subsection{جداول مقایسه‌ای}
+	\label{subsec:comparison-tables}
+	
+	\subsubsection{جدول مقایسه انواع دستورات غیرمعمول}
+	\label{subsubsec:instructions-comparison}
+	
+ جدول 1 انواع مختلف دستورات غیرمعمول و تأثیر آن‌ها بر دیس‌اسمبلرها را مقایسه می‌کند.
+	
+	\begin{table}[!htbp]
+		\centering
+		\caption{مقایسه انواع دستورات غیرمعمول در \lr{Anti-Disassembly}}
+		\label{table:unusual-instructions-comparison}
+		\begin{tabular}{|p{0.25\textwidth}|p{0.3\textwidth}|p{0.35\textwidth}|}
+			\hline
+			\textbf{نوع دستور} & \textbf{مثال‌ها} & \textbf{تأثیر بر دیس‌اسمبلر} \\
+			\hline
+			دستورات شرطی پیچیده & \lr{JZ, JNZ, JC} با شرایط پیچیده & شکستن تحلیل جریان کنترل \\
+			\hline
+			دستورات \lr{FPU} & \lr{FCOMIP, FCHS, FLDZ} & ایجاد خطا در تحلیل پشته \lr{FPU} \\
+			\hline
+			دستورات سیستم & \lr{IN, OUT, SGDT} & مشکل در شبیه‌سازی محیط \\
+			\hline
+			دستورات رشته‌ای & \lr{REP MOVSB, SCASB} & پیچیدگی در تحلیل حلقه‌ها \\
+			\hline
+			دستورات حالت وابسته & \lr{ENTER, BOUND} & وابستگی به حالت اجرا \\
+			\hline
+			دستورات محاسباتی پیچیده & \lr{ROR, ROL, BTC} & مبهم کردن محاسبات \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
+	\subsubsection{جدول مقایسه میزان اثرگذاری}
+	\label{subsubsec:effectiveness-comparison}
+	
+ جدول 2 میزان اثرگذاری تکنیک‌های مختلف مبتنی بر دستورات غیرمعمول را نشان می‌دهد.
+	
+	\begin{table}[!htbp]
+		\centering
+		\caption{مقایسه میزان اثرگذاری تکنیک‌های دستورات غیرمعمول}
+		\label{table:effectiveness-comparison}
+		\begin{tabular}{|p{0.3\textwidth}|p{0.2\textwidth}|p{0.25\textwidth}|p{0.15\textwidth}|}
+			\hline
+			\textbf{تکنیک} & \textbf{میزان پیچیدگی} & \textbf{تأثیر بر عملکرد} & \textbf{کارایی} \\
+			\hline
+			دستورات شرطی پیچیده & متوسط & کم & بالا \\
+			\hline
+			دستورات \lr{FPU} غیرمعمول & بالا & متوسط & بسیار بالا \\
+			\hline
+			دستورات سیستم & بسیار بالا & بالا & متوسط \\
+			\hline
+			دستورات رشته‌ای پیچیده & متوسط & کم & بالا \\
+			\hline
+			دستورات حالت وابسته & بالا & متوسط & بالا \\
+			\hline
+			ترکیب چندین تکنیک & بسیار بالا & بالا & بسیار بالا \\
+			\hline
+		\end{tabular}
+	\end{table}
+	
 
